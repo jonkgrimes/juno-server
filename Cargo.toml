@@ -1,0 +1,9 @@
+[package]
+name = "juno-server"
+version = "0.1.0"
+authors = ["Jon Grimes <jong@spiceworks.com>"]
+
+[dependencies]
+tera = "*"
+actix = "0.7"
+actix-web = "0.7"
