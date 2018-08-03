@@ -6,6 +6,9 @@ extern crate bytes;
 #[macro_use]
 extern crate tera;
 
+mod agent_server;
+
+use std::str;
 use bytes::Bytes;
 use futures::future::Future;
 use actix::*;
@@ -17,6 +20,7 @@ use actix_web::{
 
 struct AppState {
     template: tera::Tera,
+    addr: Addr<agent_server::AgentServer>,
 }
 
 struct Ws;
@@ -49,11 +53,17 @@ fn index(req: HttpRequest<AppState>) -> Result<HttpResponse, Error> {
 fn data(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
     req.body()
         .from_err()
-        .and_then(|bytes: Bytes| {
+        .and_then(move |bytes: Bytes| {
             println!("===== Body =====\n{:?}", bytes);
+            req.state().addr
+                .do_send(agent_server::ClientMessage {msg: str::from_utf8(&bytes).unwrap().to_owned()});
             Ok(HttpResponse::Ok().content_type("text/html").body("OK"))
         })
         .responder()
+}
+
+fn stream(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
+    ws::start(req, Ws)
 }
 
 fn four_oh_four(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
@@ -69,15 +79,18 @@ fn four_oh_four(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
 fn main() {
     ::std::env::set_var("RUST_LOG", "actix_web=info");
     env_logger::init();
+    let sys = actix::System::new("juno-server");
 
-    server::new(|| {
+    let agent_server = Arbiter::start(|_| agent_server::AgentServer::default());
+
+    server::new(move || {
         let tera = compile_templates!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"));
 
-        App::with_state(AppState { template: tera })
+        App::with_state(AppState { template: tera, addr: agent_server.clone() })
             .middleware(middleware::Logger::default())
             .resource("/", |r| r.method(Method::GET).with(index))
             .resource("/data", |r| r.method(Method::POST).with(data))
-            .resource("/stream", |r| r.f(|req| ws::start(req, Ws)))
+            .resource("/stream", |r| r.f(stream))
             .handler("/static", fs::StaticFiles::new("./static").unwrap().show_files_listing())
             .default_resource(|r| {
                 // 404 for GET request
@@ -89,5 +102,7 @@ fn main() {
             })
     }).bind("127.0.0.1:8080")
         .expect("Cannot bind to 127.0.0.1:8080")
-        .run();
+        .start();
+    
+    let _ = sys.run();
 }
