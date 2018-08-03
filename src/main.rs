@@ -77,7 +77,7 @@ fn main() {
             .middleware(middleware::Logger::default())
             .resource("/", |r| r.method(Method::GET).with(index))
             .resource("/data", |r| r.method(Method::POST).with(data))
-            .resource("/stream/", |r| r.f(|req| ws::start(req, Ws)))
+            .resource("/stream", |r| r.f(|req| ws::start(req, Ws)))
             .handler("/static", fs::StaticFiles::new("./static").unwrap().show_files_listing())
             .default_resource(|r| {
                 // 404 for GET request
