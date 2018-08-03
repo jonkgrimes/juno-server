@@ -1,3 +1,22 @@
 .header {
   margin-top: 15px;
 }
+
+.good {
+  color: #155724;
+  background-color: #d4edda;
+}
+
+.warn {
+  color: #856404;
+  background-color: #FEFDF5;
+}
+
+.alert {
+  color: #721c24;
+  background-color: #f8d7da;
+}
+
+table {
+  font-size: 2.3rem;
+}
