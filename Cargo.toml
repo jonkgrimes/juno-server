@@ -6,4 +6,7 @@ authors = ["Jon Grimes <jong@spiceworks.com>"]
 [dependencies]
 env_logger = "0.5"
 tera = "*"
-actix-web = { git = "https://github.com/actix/actix-web" }
+actix = "0.7.0"
+actix-web = "0.7.3"
+bytes = "0.4"
+futures = "0.1"

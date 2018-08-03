@@ -5,15 +5,21 @@
   <meta charset="utf-8" />
   <title>Juno</title>
   {% endblock head %}
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
+  <link rel="stylesheet" href="//cdn.rawgit.com/necolas/normalize.css/master/normalize.css">
+  <link rel="stylesheet" href="//cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css">
 </head>
 <body>
-  <div id="content">
-    {% block content %}{% endblock content %}
+  <div class="container">
+    <div id="content">
+      {% block content %}{% endblock content %}
+    </div>
+    <div id="footer">
+      {% block footer %}
+        &copy; Copyright 2018 by <a href="https://jonkgrimes.com">Jon Grimes</a>
+      {% endblock %}
+    </div>
   </div>
-  <div id="footer">
-    {% block footer %}
-      &copy; Copyright 2018 by <a href="https://jonkgrimes.com">Jon Grimes</a>
-    {% endblock %}
-  </div>
+  <script async="" defer="" src="static/app.js"></script>
 </body>
 </html>
