@@ -41,8 +41,9 @@ impl Actor for AgentServer {
 impl Handler<Connect> for AgentServer {
   type Result = ();
 
-  fn handle(&mut self, _msg: Connect, _: &mut Context<Self>) -> Self::Result {
+  fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
     println!("Someone joined!");
+    self.sessions.push(msg.addr);
   }
 }
 

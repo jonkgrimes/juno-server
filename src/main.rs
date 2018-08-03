@@ -27,6 +27,26 @@ struct Ws;
 
 impl Actor for Ws {
     type Context = WebsocketContext<Self, AppState>;
+    
+    fn started(&mut self, ctx: &mut Self::Context) {
+        let addr = ctx.address();
+        ctx.state()
+            .addr
+            .send(agent_server::Connect { addr: addr.recipient() })
+            .into_actor(self)
+            .then(|_res, _act, _ctx| {
+                fut::ok(())
+            })
+            .wait(ctx);
+    }
+}
+
+impl Handler<agent_server::Message> for Ws {
+    type Result = ();
+
+    fn handle(&mut self, msg: agent_server::Message, ctx: &mut Self::Context) {
+        ctx.text(msg.0);
+    }
 }
 
 impl StreamHandler<Message, ProtocolError> for Ws {
