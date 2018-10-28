@@ -9,6 +9,7 @@ extern crate tera;
 extern crate diesel;
 extern crate r2d2;
 extern crate uuid;
+extern crate ipnetwork;
 
 mod schema;
 mod db;
