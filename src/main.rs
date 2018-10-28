@@ -10,12 +10,14 @@ extern crate diesel;
 extern crate r2d2;
 extern crate uuid;
 extern crate ipnetwork;
+extern crate dotenv;
 
 mod schema;
 mod db;
 mod models;
 mod agent_server;
 
+use dotenv::dotenv;
 use std::str;
 use bytes::Bytes;
 use futures::future::Future;
@@ -23,12 +25,17 @@ use actix::*;
 use actix_web::{
     error, http::Method, middleware, pred, server, ws, fs,
     ws::{WebsocketContext, Message, ProtocolError},
-    App, Error, HttpRequest, HttpResponse, AsyncResponder, FutureResponse, HttpMessage, Result,
+    App, Error, HttpRequest, HttpResponse, AsyncResponder, FutureResponse, HttpMessage, Result, Json,
 };
+use diesel::prelude::*;
+use diesel::r2d2::ConnectionManager;
+
+use db::{RegisterAgent, DbExecutor};
 
 struct AppState {
     template: tera::Tera,
     addr: Addr<agent_server::AgentServer>,
+    db: Addr<DbExecutor>,
 }
 
 struct Ws;
@@ -111,10 +118,22 @@ fn main() {
 
     let agent_server = Arbiter::start(|_| agent_server::AgentServer::default());
 
+    // database setup
+    dotenv().ok();
+
+    let database_url = ::std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set");
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let pool = r2d2::Pool::builder()
+        .build(manager)
+        .expect("Failed to create pool.");
+
+    let db = SyncArbiter::start(3, move || DbExecutor(pool.clone()));
+
     server::new(move || {
         let tera = compile_templates!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"));
 
-        App::with_state(AppState { template: tera, addr: agent_server.clone() })
+        App::with_state(AppState { template: tera, addr: agent_server.clone(), db: db.clone() })
             .middleware(middleware::Logger::default())
             .resource("/", |r| r.method(Method::GET).with(index))
             .resource("/data", |r| r.method(Method::POST).with(data))
