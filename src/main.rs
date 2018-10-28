@@ -5,7 +5,14 @@ extern crate futures;
 extern crate bytes;
 #[macro_use]
 extern crate tera;
+#[macro_use]
+extern crate diesel;
+extern crate r2d2;
+extern crate uuid;
 
+mod schema;
+mod db;
+mod models;
 mod agent_server;
 
 use std::str;
