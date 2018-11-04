@@ -1,6 +1,5 @@
 #![allow(proc_macro_derive_resolution_fallback)]
 use uuid::Uuid;
-use ipnetwork::IpNetwork;
 
 use super::schema::agents;
 
@@ -9,13 +8,13 @@ use super::schema::agents;
 pub struct NewAgent<'a> {
     pub uuid: Uuid,
     pub hostname: &'a str,
-    pub ip: IpNetwork,
+    pub ip: String,
 }
 
-#[derive(Queryable)]
+#[derive(Serialize, Deserialize, Queryable)]
 pub struct Agent {
     pub id: i32,
     pub uuid: Uuid,
     pub hostname: String,
-    pub ip: IpNetwork,
+    pub ip: String,
 }

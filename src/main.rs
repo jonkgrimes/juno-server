@@ -11,6 +11,10 @@ extern crate r2d2;
 extern crate uuid;
 extern crate ipnetwork;
 extern crate dotenv;
+#[macro_use]
+extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
 mod schema;
 mod db;
@@ -25,12 +29,18 @@ use actix::*;
 use actix_web::{
     error, http::Method, middleware, pred, server, ws, fs,
     ws::{WebsocketContext, Message, ProtocolError},
-    App, Error, HttpRequest, HttpResponse, AsyncResponder, FutureResponse, HttpMessage, Result, Json,
+    App, Error, HttpRequest, HttpResponse, AsyncResponder, FutureResponse, HttpMessage, Result,
 };
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 
-use db::{RegisterAgent, DbExecutor};
+use db::{DbExecutor};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct RegisterAgentPayload {
+    hostname: String,
+    ip: String
+}
 
 struct AppState {
     template: tera::Tera,
@@ -97,6 +107,26 @@ fn data(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
         .responder()
 }
 
+fn register(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
+    req.json()
+        .from_err()
+        .and_then(move |val: RegisterAgentPayload| {
+            let msg = db::RegisterAgent {
+                hostname: val.hostname,
+                ip: val.ip
+            };
+            req.state()
+                .db
+                .send(msg)
+                .from_err()
+                .and_then(|res| match res {
+                    Ok(agent) => Ok(HttpResponse::Ok().json(agent)),
+                    Err(_) => Ok(HttpResponse::InternalServerError().json(r#"{ "error": "An internal server error occurred." }"#))
+                })
+        })
+        .responder()
+}
+
 fn stream(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
     ws::start(req, Ws)
 }
@@ -137,7 +167,7 @@ fn main() {
             .middleware(middleware::Logger::default())
             .resource("/", |r| r.method(Method::GET).with(index))
             .resource("/data", |r| r.method(Method::POST).with(data))
-            .resource("/register", |r| r.method(Method::POST).with(data))
+            .resource("/register", |r| r.method(Method::POST).with(register))
             .resource("/stream", |r| r.f(stream))
             .handler("/static", fs::StaticFiles::new("./static").unwrap().show_files_listing())
             .default_resource(|r| {
