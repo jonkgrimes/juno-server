@@ -1,3 +1,4 @@
+#![allow(proc_macro_derive_resolution_fallback)]
 extern crate actix;
 extern crate actix_web;
 extern crate env_logger;
@@ -11,8 +12,6 @@ extern crate r2d2;
 extern crate uuid;
 extern crate ipnetwork;
 extern crate dotenv;
-#[macro_use]
-extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 
