@@ -29,6 +29,12 @@ $(function() {
     writeMessage: function(message) {
       var model = JSON.parse(message.data);
 
+      console.log(model.agent_id);
+
+      var row = $("#" + model.agent_id);
+
+      console.log(row);
+
       var cpu = model["cpu"];
       var cpuClass = "good";
       if (cpu > 50 && cpu < 80) {
@@ -36,8 +42,8 @@ $(function() {
       } else if (cpu >= 80) {
         cpuClass = "alert";
       };
-      $("#cpu").text(cpu + "%");
-      $("#cpu").removeClass("good warn alert").addClass(cpuClass);
+      row.find(".cpu").text(cpu + "%");
+      row.find(".cpu").removeClass("good warn alert").addClass(cpuClass);
 
       var memory = model["memory"];
       var memoryClass = "good";
@@ -46,11 +52,11 @@ $(function() {
       } else if (memory >= 6000) {
         memoryClass = "alert";
       };
-      $("#memory").text(memory + "MB");
-      $("#memory").removeClass("good warn alert").addClass(memoryClass);
+      row.find(".memory").text(memory + "MB");
+      row.find(".memory").removeClass("good warn alert").addClass(memoryClass);
 
-      $("#network_in").text(model["network_in"] + " bytes");
-      $("#network_out").text(model["network_out"] + " bytes");
+      row.find(".network_in").text(model["network_in"] + " bytes");
+      row.find(".network_out").text(model["network_out"] + " bytes");
     }
   };
 

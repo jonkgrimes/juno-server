@@ -114,8 +114,12 @@ fn data(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
         .from_err()
         .and_then(move |bytes: Bytes| {
             println!("===== Body =====\n{:?}", bytes);
-            req.state().addr
-                .do_send(agent_server::ClientMessage {msg: str::from_utf8(&bytes).unwrap().to_owned()});
+            let msg = agent_server::ClientMessage {
+                msg: str::from_utf8(&bytes).unwrap().to_owned()
+            };
+            req.state()
+                .addr
+                .do_send(msg);
             Ok(HttpResponse::Ok().content_type("text/html").body("OK"))
         })
         .responder()
