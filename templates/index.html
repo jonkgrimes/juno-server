@@ -9,6 +9,7 @@
     <thead>
       <tr>
         <th>Host</th>
+        <th>IP Address</th>
         <th>CPU</th>
         <th>Memory</th>
         <th>Network In</th>
@@ -16,13 +17,16 @@
       </tr>
     </thead>
     <tbody>
-      <tr>
-        <td id="hostname">jong-mbp</td>
-        <td class="good" id="cpu"></td>
-        <td class="good" id="memory"></td>
-        <td class="good" id="network_in"></td>
-        <td class="good" id="network_out"></td>
-      </tr>
+      {% for agent in agents %}
+        <tr id="{{agent.uuid}}">
+          <td class="hostname">{{ agent.hostname }} </td>
+          <td class="id_address">{{ agent.ip }} </td>
+          <td class="cpu"></td>
+          <td class="memory"></td>
+          <td class="network_in"></td>
+          <td class="network_out"></td>
+        </tr>
+      {% endfor %}
     </tbody>
   </table>
 {% endblock content %}

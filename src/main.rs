@@ -83,14 +83,30 @@ impl StreamHandler<Message, ProtocolError> for Ws {
     }
 }
 
-fn index(req: HttpRequest<AppState>) -> Result<HttpResponse, Error> {
-    let state = req.state();
-    let ctx = tera::Context::new();
-    let s = state
-        .template
-        .render("index.html", &ctx)
-        .map_err(|_| error::ErrorInternalServerError("Template error"))?;
-    Ok(HttpResponse::Ok().content_type("text/html").body(s))
+fn index(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
+    let msg = db::ListAgents();
+
+    req.state()
+        .db
+        .send(msg)
+        .from_err()
+        .and_then(move |res| {
+            match res {
+                Ok(agents) => {
+                    let mut ctx = tera::Context::new();
+                    ctx.add("agents", &agents);
+                    let html = req.state()
+                        .template
+                        .render("index.html", &ctx)
+                        .map_err(|e| error::ErrorInternalServerError(e.description().to_owned()))?;
+                    Ok(HttpResponse::Ok().content_type("text/html").body(html))
+                },
+                Err(_) =>  {
+                    Ok(HttpResponse::InternalServerError().body("An error occurred"))
+                }
+            }
+        })
+        .responder()
 }
 
 fn data(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
