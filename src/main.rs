@@ -17,30 +17,23 @@ extern crate serde_derive;
 mod schema;
 mod db;
 mod models;
+mod agent_routes;
 mod agent_server;
 
 use dotenv::dotenv;
-use std::str;
-use bytes::Bytes;
 use futures::future::Future;
 use actix::*;
 use actix_web::{
     error, http::Method, middleware, pred, server, ws, fs,
     ws::{WebsocketContext, Message, ProtocolError},
-    App, Error, HttpRequest, HttpResponse, AsyncResponder, FutureResponse, HttpMessage, Result,
+    App, Error, HttpRequest, HttpResponse, AsyncResponder, FutureResponse, Result,
 };
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 
 use db::{DbExecutor};
 
-#[derive(Debug, Serialize, Deserialize)]
-struct RegisterAgentPayload {
-    hostname: String,
-    ip: String
-}
-
-struct AppState {
+pub struct AppState {
     template: tera::Tera,
     addr: Addr<agent_server::AgentServer>,
     db: Addr<DbExecutor>,
@@ -109,46 +102,6 @@ fn index(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
         .responder()
 }
 
-fn data(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    req.body()
-        .from_err()
-        .and_then(move |bytes: Bytes| {
-            println!("===== Body =====\n{:?}", bytes);
-            let msg = agent_server::ClientMessage {
-                msg: str::from_utf8(&bytes).unwrap().to_owned()
-            };
-            req.state()
-                .addr
-                .do_send(msg);
-            Ok(HttpResponse::Ok().content_type("text/html").body("OK"))
-        })
-        .responder()
-}
-
-fn register(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    req.json()
-        .from_err()
-        .and_then(move |val: RegisterAgentPayload| {
-            let msg = db::RegisterAgent {
-                hostname: val.hostname,
-                ip: val.ip
-            };
-            req.state()
-                .db
-                .send(msg)
-                .from_err()
-                .and_then(|res| match res {
-                    Ok(agent) => Ok(HttpResponse::Ok().json(agent)),
-                    Err(_) => Ok(HttpResponse::InternalServerError().json(r#"{ "error": "An internal server error occurred." }"#))
-                })
-        })
-        .responder()
-}
-
-fn stream(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
-    ws::start(req, Ws)
-}
-
 fn four_oh_four(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
     let state = req.state();
     let ctx = tera::Context::new();
@@ -184,9 +137,9 @@ fn main() {
         App::with_state(AppState { template: tera, addr: agent_server.clone(), db: db.clone() })
             .middleware(middleware::Logger::default())
             .resource("/", |r| r.method(Method::GET).with(index))
-            .resource("/data", |r| r.method(Method::POST).with(data))
-            .resource("/register", |r| r.method(Method::POST).with(register))
-            .resource("/stream", |r| r.f(stream))
+            .resource("/agents/data", |r| r.method(Method::POST).with(agent_routes::data))
+            .resource("/agents/register", |r| r.method(Method::POST).with(agent_routes::register))
+            .resource("/agents/stream", |r| r.f(agent_routes::stream))
             .handler("/static", fs::StaticFiles::new("./static").unwrap().show_files_listing())
             .default_resource(|r| {
                 // 404 for GET request

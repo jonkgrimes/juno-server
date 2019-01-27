@@ -11,7 +11,7 @@ $(function() {
 
     connect: function () {
       this.disconnect();
-      var wsUri = (window.location.protocol == 'https:' && 'wss://' || 'ws://') + window.location.host + '/stream';
+      var wsUri = (window.location.protocol == 'https:' && 'wss://' || 'ws://') + window.location.host + '/agents/stream';
       this.conn = new WebSocket(wsUri);
       console.log("Connecting...");
       this.conn.onopen = function() {
