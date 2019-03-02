@@ -2,11 +2,11 @@ use std::str;
 use bytes::Bytes;
 use futures::future::Future;
 use actix_web::{
-    ws, fs,
+    ws, 
     Error, HttpRequest, HttpResponse, AsyncResponder, FutureResponse, HttpMessage, Result,
 };
 
-use super::{AppState, Ws};
+use app::{AppState, Ws};
 use agent_server::ClientMessage;
 use db::{RegisterAgent};
 
@@ -29,7 +29,7 @@ pub fn register(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
                 ip: val.ip
             };
             req.state()
-                .db
+                .db()
                 .send(msg)
                 .from_err()
                 .and_then(|res| match res {
@@ -49,7 +49,7 @@ pub fn data(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
                 msg: str::from_utf8(&bytes).unwrap().to_owned()
             };
             req.state()
-                .addr
+                .addr()
                 .do_send(msg);
             Ok(HttpResponse::Ok().content_type("text/html").body("OK"))
         })

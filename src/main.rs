@@ -14,6 +14,7 @@ extern crate dotenv;
 #[macro_use]
 extern crate serde_derive;
 
+mod app;
 mod schema;
 mod db;
 mod models;
@@ -21,96 +22,13 @@ mod agent_routes;
 mod agent_server;
 
 use dotenv::dotenv;
-use futures::future::Future;
 use actix::*;
-use actix_web::{
-    error, http::Method, middleware, pred, server, ws, fs,
-    ws::{WebsocketContext, Message, ProtocolError},
-    App, Error, HttpRequest, HttpResponse, AsyncResponder, FutureResponse, Result,
-};
+use actix_web::{server};
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 
 use db::{DbExecutor};
 
-pub struct AppState {
-    template: tera::Tera,
-    addr: Addr<agent_server::AgentServer>,
-    db: Addr<DbExecutor>,
-}
-
-struct Ws;
-
-impl Actor for Ws {
-    type Context = WebsocketContext<Self, AppState>;
-    
-    fn started(&mut self, ctx: &mut Self::Context) {
-        let addr = ctx.address();
-        ctx.state()
-            .addr
-            .send(agent_server::Connect { addr: addr.recipient() })
-            .into_actor(self)
-            .then(|_res, _act, _ctx| {
-                fut::ok(())
-            })
-            .wait(ctx);
-    }
-}
-
-impl Handler<agent_server::Message> for Ws {
-    type Result = ();
-
-    fn handle(&mut self, msg: agent_server::Message, ctx: &mut Self::Context) {
-        ctx.text(msg.0);
-    }
-}
-
-impl StreamHandler<Message, ProtocolError> for Ws {
-    fn handle(&mut self, msg: Message, ctx: &mut Self::Context) {
-        match msg {
-            Message::Ping(msg) => ctx.pong(&msg),
-            ws::Message::Text(text) => ctx.text(text),
-            ws::Message::Binary(bin) => ctx.binary(bin),
-            _ => (), 
-        }
-    }
-}
-
-fn index(req: HttpRequest<AppState>) -> FutureResponse<HttpResponse> {
-    let msg = db::ListAgents();
-
-    req.state()
-        .db
-        .send(msg)
-        .from_err()
-        .and_then(move |res| {
-            match res {
-                Ok(agents) => {
-                    let mut ctx = tera::Context::new();
-                    ctx.add("agents", &agents);
-                    let html = req.state()
-                        .template
-                        .render("index.html", &ctx)
-                        .map_err(|e| error::ErrorInternalServerError(e.description().to_owned()))?;
-                    Ok(HttpResponse::Ok().content_type("text/html").body(html))
-                },
-                Err(_) =>  {
-                    Ok(HttpResponse::InternalServerError().body("An error occurred"))
-                }
-            }
-        })
-        .responder()
-}
-
-fn four_oh_four(req: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
-    let state = req.state();
-    let ctx = tera::Context::new();
-    let s = state
-        .template
-        .render("not_found.html", &ctx)
-        .map_err(|_| error::ErrorInternalServerError("Template error"))?;
-    Ok(HttpResponse::NotFound().content_type("text/html").body(s))
-}
 
 fn main() {
     ::std::env::set_var("RUST_LOG", "actix_web=info");
@@ -131,25 +49,8 @@ fn main() {
 
     let db = SyncArbiter::start(3, move || DbExecutor(pool.clone()));
 
-    server::new(move || {
-        let tera = compile_templates!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"));
-
-        App::with_state(AppState { template: tera, addr: agent_server.clone(), db: db.clone() })
-            .middleware(middleware::Logger::default())
-            .resource("/", |r| r.method(Method::GET).with(index))
-            .resource("/agents/data", |r| r.method(Method::POST).with(agent_routes::data))
-            .resource("/agents/register", |r| r.method(Method::POST).with(agent_routes::register))
-            .resource("/agents/stream", |r| r.f(agent_routes::stream))
-            .handler("/static", fs::StaticFiles::new("./static").unwrap().show_files_listing())
-            .default_resource(|r| {
-                // 404 for GET request
-                r.method(Method::GET).f(four_oh_four);
-                // all requests that are not `GET`
-                r.route()
-                    .filter(pred::Not(pred::Get()))
-                    .f(|_req| HttpResponse::MethodNotAllowed());
-            })
-    }).bind("127.0.0.1:8080")
+    server::new(move || app::create_app(agent_server.clone(), db.clone()))
+        .bind("127.0.0.1:8080")
         .expect("Cannot bind to 127.0.0.1:8080")
         .start();
     
